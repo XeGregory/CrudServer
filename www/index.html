@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>CRUD DELPHI</title>
+
+<!-- Optionnel : police Google -->
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#f5f7fb; --card:#ffffff; --muted:#6b7280; --text:#0f1724;
+  --primary:#0b74ff; --accent:#06b6d4; --danger:#ef4444;
+  --radius:12px; --shadow:0 8px 24px rgba(15,23,42,0.06);
+  --glass: rgba(11,18,32,0.03);
+  --max-width:1200px;
+  --gap:16px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+.container{max-width:var(--max-width);margin:28px auto;padding:20px;gap:var(--gap)}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--primary),var(--accent));display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;box-shadow:var(--shadow)}
+.title{font-size:18px;margin:0}
+.subtitle{font-size:13px;color:var(--muted)}
+.layout{display:grid;grid-template-columns:1fr 360px;gap:18px}
+@media (max-width:980px){ .layout{grid-template-columns:1fr} }
+
+.card{background:var(--card);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);border:1px solid var(--glass)}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.input, select{padding:10px 12px;border-radius:10px;border:1px solid var(--glass);background:transparent;min-width:160px}
+.btn{background:linear-gradient(90deg,var(--primary),var(--accent));color:#fff;border:0;padding:10px 14px;border-radius:10px;cursor:pointer;font-weight:600}
+.btn.secondary{background:transparent;border:1px solid var(--glass);color:var(--text)}
+.btn.ghost{background:transparent;border:0;color:var(--muted)}
+.btn.danger{background:linear-gradient(90deg,#ff7a7a,var(--danger));color:#fff}
+
+.table-wrap{overflow:auto;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+thead th{padding:12px 10px;text-align:left;color:var(--muted);font-weight:600;border-bottom:1px solid var(--glass)}
+tbody td{padding:12px 10px;border-bottom:1px solid var(--glass);vertical-align:middle}
+.row-actions button{margin-right:8px;padding:6px 8px;border-radius:8px;border:0;cursor:pointer}
+.row-actions .edit{background:linear-gradient(90deg,#ffd166,#ffb4a2);color:#000}
+.row-actions .del{background:linear-gradient(90deg,#ff7a7a,#ef4444);color:#fff}
+
+.empty{padding:28px;text-align:center;color:var(--muted)}
+
+.modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,0.45);z-index:60;opacity:0;pointer-events:none;transition:opacity .18s}
+.modal.open{opacity:1;pointer-events:auto}
+.modal-box{background:var(--card);padding:18px;border-radius:12px;min-width:320px;max-width:720px;border:1px solid var(--glass)}
+.form-row{display:flex;gap:10px;align-items:center}
+.form-row .input{flex:1}
+
+.toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:10px;z-index:80}
+.toast{background:#111827;color:#fff;padding:10px 14px;border-radius:10px;box-shadow:var(--shadow);font-size:13px}
+
+.small{font-size:13px;color:var(--muted)}
+.footer{margin-top:18px;text-align:center;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="container" role="main" aria-labelledby="mainTitle">
+  <header class="header">
+    <div class="brand">
+      <div class="logo">CR</div>
+      <div>
+        <h1 id="mainTitle" class="title">Gestion des éléments</h1>
+        <div class="subtitle">DEMO API REST DELPHI • Stockage JSON</div>
+      </div>
+    </div>
+    <div class="small">Serveur: <strong>http://localhost:8080</strong></div>
+  </header>
+
+  <div class="layout">
+    <!-- Left: table and controls -->
+    <section>
+      <div class="card" aria-labelledby="tableTitle">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div>
+            <h2 id="tableTitle" style="margin:0;font-size:16px">Éléments</h2>
+            <div class="small">Rechercher, trier et gérer les éléments</div>
+          </div>
+          <div class="controls" role="toolbar" aria-label="Actions">
+            <input id="q" class="input" type="search" placeholder="Rechercher titre ou contenu" aria-label="Recherche">
+            <select id="sort" class="input" aria-label="Trier">
+              <option value="id_asc">ID ↑</option>
+              <option value="id_desc">ID ↓</option>
+              <option value="title_asc">Titre A→Z</option>
+              <option value="title_desc">Titre Z→A</option>
+            </select>
+            <button id="btnRefresh" class="btn secondary">Rafraîchir</button>
+            <button id="btnGenerate" class="btn secondary">Générer</button>
+            <button id="btnClear" class="btn ghost">Vider</button>
+          </div>
+        </div>
+
+        <div class="table-wrap" id="tableWrap" style="margin-top:14px">
+          <table aria-live="polite" aria-describedby="tableDesc">
+            <thead>
+              <tr><th style="width:80px">ID</th><th>Titre</th><th>Contenu</th><th style="width:140px">Actions</th></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+          <div id="empty" class="empty" hidden>Aucun élément. Créez ou générez des exemples.</div>
+        </div>
+        <div id="tableDesc" class="small" style="margin-top:10px">Les modifications sont sauvegardées automatiquement.</div>
+      </div>
+    </section>
+
+    <!-- Right: create form -->
+    <aside>
+      <div class="card" aria-labelledby="createTitle">
+        <h3 id="createTitle" style="margin-top:0">Créer un élément</h3>
+        <form id="createForm" autocomplete="off" novalidate>
+          <div style="margin-bottom:10px">
+            <label class="small" for="titleInput">Titre</label>
+            <input id="titleInput" class="input" name="title" type="text" required maxlength="120" placeholder="Titre (obligatoire)">
+          </div>
+          <div style="margin-bottom:10px">
+            <label class="small" for="contentInput">Contenu</label>
+            <input id="contentInput" class="input" name="content" type="text" maxlength="400" placeholder="Contenu (optionnel)">
+          </div>
+          <div style="display:flex;gap:8px">
+            <button type="submit" class="btn">Créer</button>
+            <button type="button" id="btnCreateSample" class="btn secondary">Exemple</button>
+          </div>
+          <div id="formMsg" class="small" style="margin-top:10px"></div>
+        </form>
+      </div>
+
+      <div class="card" style="margin-top:18px">
+        <h4 style="margin:0 0 8px 0">Aide</h4>
+        <ul class="small" style="margin:0;padding-left:18px">
+          <li>Recherche instantanée par titre ou contenu.</li>
+          <li>Tri et génération d’exemples pour tests rapides.</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
+
+  <div class="footer">Test local sur <strong>http://localhost:8080</strong></div>
+</div>
+
+<!-- Modal édition -->
+<div id="modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <h3 id="modalTitle">Modifier l'élément</h3>
+    <form id="editForm" novalidate>
+      <div class="form-row" style="margin-bottom:10px">
+        <input id="editTitle" class="input" required maxlength="120" type="text" placeholder="Titre">
+      </div>
+      <div class="form-row" style="margin-bottom:10px">
+        <input id="editContent" class="input" maxlength="400" type="text" placeholder="Contenu">
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button type="submit" class="btn">Enregistrer</button>
+        <button type="button" id="btnCancel" class="btn secondary">Annuler</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+/* ---------- Configuration ---------- */
+const API = '/api/items';
+
+/* ---------- State ---------- */
+let itemsCache = [];
+let currentEditId = null;
+
+/* ---------- Helpers ---------- */
+const $ = s => document.querySelector(s);
+const createToast = (msg, t=3000) => {
+  const el = document.createElement('div'); el.className='toast'; el.textContent = msg;
+  $('#toasts').appendChild(el); setTimeout(()=> el.remove(), t);
+};
+const setLoading = (btn, on) => {
+  if(!btn) return;
+  if(on){ btn.dataset.old = btn.innerHTML; btn.innerHTML = '…'; btn.disabled=true; }
+  else { if(btn.dataset.old) btn.innerHTML = btn.dataset.old; btn.disabled=false; }
+};
+
+/* ---------- API ---------- */
+async function apiFetchAll(){
+  try{
+    const res = await fetch(API);
+    if(!res.ok) throw new Error('Erreur réseau');
+    return await res.json();
+  } catch(e){ console.error(e); createToast('Erreur chargement'); return []; }
+}
+async function apiCreate(obj){
+  const res = await fetch(API, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(obj)});
+  if(!res.ok) throw new Error('Création échouée');
+  return await res.json();
+}
+async function apiUpdate(id,obj){
+  const res = await fetch(API + '?id=' + encodeURIComponent(id), {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(obj)});
+  if(!res.ok) throw new Error('Mise à jour échouée');
+  return await res.json();
+}
+async function apiDelete(id){
+  const res = await fetch(API + '?id=' + encodeURIComponent(id), {method:'DELETE'});
+  if(!res.ok) throw new Error('Suppression échouée');
+  return await res.json();
+}
+
+/* ---------- Rendering ---------- */
+function escapeHtml(s){ return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function renderTable(items){
+  const tbody = $('#tbody'); tbody.innerHTML = '';
+  if(!items || items.length === 0){ $('#empty').hidden = false; return; } else $('#empty').hidden = true;
+  items.forEach(it => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="font-weight:600">${it.id}</td>
+      <td>${escapeHtml(it.title||'')}</td>
+      <td>${escapeHtml(it.content||'')}</td>
+      <td class="row-actions">
+        <button class="edit" data-id="${it.id}" title="Modifier">✎</button>
+        <button class="del" data-id="${it.id}" title="Supprimer">🗑</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ---------- Data flow ---------- */
+async function loadData(){
+  const all = await apiFetchAll();
+  itemsCache = Array.isArray(all) ? all : [];
+  applyFilters();
+}
+
+/* ---------- Filters and sort ---------- */
+function applyFilters(){
+  const q = $('#q').value.trim().toLowerCase();
+  const sort = $('#sort').value;
+  let filtered = itemsCache.filter(it => {
+    if(!q) return true;
+    return (it.title||'').toLowerCase().includes(q) || (it.content||'').toLowerCase().includes(q);
+  });
+  filtered.sort((a,b)=>{
+    switch(sort){
+      case 'id_asc': return a.id - b.id;
+      case 'id_desc': return b.id - a.id;
+      case 'title_asc': return (a.title||'').localeCompare(b.title||'');
+      case 'title_desc': return (b.title||'').localeCompare(a.title||'');
+      default: return 0;
+    }
+  });
+  renderTable(filtered);
+}
+
+/* ---------- Events ---------- */
+$('#q').addEventListener('input', debounce(()=> applyFilters(), 180));
+$('#sort').addEventListener('change', applyFilters);
+$('#btnRefresh').addEventListener('click', async (e)=>{ setLoading(e.target,true); await loadData(); setLoading(e.target,false); });
+
+$('#createForm').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const btn = ev.submitter || $('#createForm button[type="submit"]');
+  const title = $('#titleInput').value.trim();
+  const content = $('#contentInput').value.trim();
+  if(!title){ $('#formMsg').textContent = 'Le titre est requis.'; return; }
+  try{ setLoading(btn,true); await apiCreate({title, content}); $('#titleInput').value=''; $('#contentInput').value=''; createToast('Élément créé'); await loadData(); }
+  catch(e){ console.error(e); createToast('Erreur création'); }
+  finally{ setLoading(btn,false); }
+});
+
+$('#btnCreateSample').addEventListener('click', ()=> {
+  $('#titleInput').value = 'Titre exemple ' + (new Date()).toLocaleTimeString();
+  $('#contentInput').value = 'Contenu d’exemple';
+});
+
+$('#btnGenerate').addEventListener('click', async (e)=>{
+  const btn = e.target; setLoading(btn,true);
+  try{
+    const promises = [];
+    for(let i=1;i<=5;i++){
+      promises.push(apiCreate({ title:`Ex ${Date.now().toString().slice(-4)}-${i}`, content:`Contenu ${i}` }));
+    }
+    await Promise.all(promises);
+    createToast('5 éléments générés'); await loadData();
+  } catch(err){ console.error(err); createToast('Erreur génération'); }
+  finally{ setLoading(btn,false); }
+});
+
+$('#btnClear').addEventListener('click', async ()=>{
+  if(!confirm('Supprimer tous les éléments ?')) return;
+  try{
+    const all = await apiFetchAll();
+    await Promise.all(all.map(it => apiDelete(it.id)));
+    createToast('Tous les éléments supprimés'); await loadData();
+  } catch(e){ console.error(e); createToast('Erreur suppression'); }
+});
+
+/* Table actions */
+$('#tbody').addEventListener('click', async (e)=>{
+  const id = e.target.dataset?.id;
+  if(!id) return;
+  if(e.target.classList.contains('del')){
+    if(!confirm('Confirmer la suppression ?')) return;
+    try{ await apiDelete(id); createToast('Supprimé'); await loadData(); } catch(err){ console.error(err); createToast('Erreur suppression'); }
+  } else if(e.target.classList.contains('edit')){
+    const item = itemsCache.find(x=>String(x.id)===String(id));
+    if(!item) return createToast('Élément introuvable');
+    currentEditId = id;
+    $('#editTitle').value = item.title || '';
+    $('#editContent').value = item.content || '';
+    openModal();
+  }
+});
+
+/* Edit modal */
+$('#editForm').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const title = $('#editTitle').value.trim();
+  const content = $('#editContent').value.trim();
+  if(!title) return createToast('Titre requis');
+  try{ await apiUpdate(currentEditId, {title, content}); createToast('Modifié'); closeModal(); await loadData(); }
+  catch(e){ console.error(e); createToast('Erreur mise à jour'); }
+});
+$('#btnCancel').addEventListener('click', closeModal);
+document.addEventListener('keydown', (e)=>{ if(e.key==='Escape') closeModal(); });
+
+function openModal(){ $('#modal').classList.add('open'); $('#modal').setAttribute('aria-hidden','false'); $('#editTitle').focus(); }
+function closeModal(){ $('#modal').classList.remove('open'); $('#modal').setAttribute('aria-hidden','true'); currentEditId = null; }
+
+/* ---------- Utilities ---------- */
+function debounce(fn, wait){ let t; return function(...a){ clearTimeout(t); t = setTimeout(()=> fn.apply(this,a), wait); }; }
+
+/* ---------- Init ---------- */
+(async ()=>{ await loadData(); })();
+</script>
+</body>
+</html>
